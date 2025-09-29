@@ -2,123 +2,104 @@
 Configuration settings for the Himachal Pradesh Disaster Alert System
 """
 import os
-import random
+
+# Database configuration
+DATABASE_PATH = 'disaster_alert.db'
 
 # API Configuration
-OPENWEATHER_API_KEY = os.getenv("OPENWEATHER_API_KEY", "8c8a4d17fd1c2424c3459856d2c401c8")
-NASA_USERNAME = os.getenv("NASA_USERNAME", "harisrinivas03")
-NASA_PASSWORD = os.getenv("NASA_PASSWORD", "Saritha@2003")
-NASA_EARTHDATA_TOKEN = os.getenv("NASA_EARTHDATA_TOKEN", "eyJ0eXAiOiJKV1QiLCJvcmlnaW4iOiJFYXJ0aGRhdGEgTG9naW4iLCJzaWciOiJlZGxqd3RwdWJrZXlfb3BzIiwiYWxnIjoiUlMyNTYifQ.eyJ0eXAiOiJKV1QiLCJvcmlnaW4iOiJFYXJ0aGRhdGEgTG9naW4iLCJzaWciOiJlZGxqd3RwdWJrZXlfb3BzIiwiYWxnIjoiUlMyNTYifQ.eyJ0eXBlIjoiVXNlciIsInVpZCI6ImhhcmlzcmluaXZhczAzIiwiZXhwIjoxNzYwNzQ1NTk5LCJpYXQiOjE3NTU1NjE1OTksImlzcyI6Imh0dHBzOi8vdXJzLmVhcnRoZGF0YS5uYXNhLmdvdiJ9")
+OPENWEATHERMAP_API_KEY = os.getenv("OPENWEATHERMAP_API_KEY", "8c8a4d17fd1c2424c3459856d2c401c8")
 
-# Climate Data Store Configuration
-CDS_URL = os.getenv("CDS_URL", "https://cds.climate.copernicus.eu/api")
-CDS_API_KEY = os.getenv("CDS_API_KEY", "d1419e08-858a-4adb-b23d-1d2e3e3a7048")
+# Telegram Bot Configuration
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "8478535363:AAFOBDMHyLzINxE9SEElZdBRJJGva3OlW9g")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "1858574343")
 
-# Alert Thresholds (Based on IMD and HP disaster patterns)
-# Rainfall thresholds
-LIGHT_RAIN_THRESHOLD = 2.5      # mm/hour - Start monitoring
-MODERATE_RAIN_THRESHOLD = 7.5   # mm/hour - Moderate alert
-HEAVY_RAIN_THRESHOLD = 15.0     # mm/hour - High alert
-VERY_HEAVY_RAIN_THRESHOLD = 25.0 # mm/hour - Critical alert
-EXTREME_RAIN_THRESHOLD = 50.0   # mm/hour - Emergency
+# System Configuration
+DATA_COLLECTION_INTERVAL = 2  # minutes between data collection cycles
+NUMBER_OF_VOLUNTEERS = 50  # number of volunteers to generate
 
-# Temperature thresholds for HP
-COLD_WAVE_THRESHOLD = 5.0       # °C - Cold wave in plains
-SEVERE_COLD_THRESHOLD = 2.0     # °C - Severe cold
-HEAT_WAVE_THRESHOLD = 35.0      # °C - Heat wave (adjusted for HP climate)
-SEVERE_HEAT_THRESHOLD = 40.0    # °C - Severe heat wave
+# Alert sensitivity for demo purposes (now deterministic)
+DEMO_MODE = True  # Set to True for enhanced alert generation during demos
+ALERT_SENSITIVITY_MULTIPLIER = 1.3  # Deterministic sensitivity increase for demo
 
-# Wind thresholds
-STRONG_WIND_THRESHOLD = 5.0     # m/s - Strong winds
-HIGH_WIND_THRESHOLD = 10.0      # m/s - High winds  
-VERY_HIGH_WIND_THRESHOLD = 15.0 # m/s - Very high winds
-
-# Landslide risk factors
-LANDSLIDE_RAIN_24H_THRESHOLD = 100.0   # mm in 24 hours
-LANDSLIDE_RAIN_48H_THRESHOLD = 150.0   # mm in 48 hours
-LANDSLIDE_RAIN_INTENSITY = 10.0      # mm/hour sustained
-
-# Flash flood indicators
-FLASH_FLOOD_RAIN_1H = 20.0     # mm in 1 hour
-FLASH_FLOOD_RAIN_3H = 50.0     # mm in 3 hours
-
-# Composite risk scoring
-HUMIDITY_HIGH_THRESHOLD = 85.0   # % - High humidity increases landslide risk
-PRESSURE_DROP_THRESHOLD = 10.0   # hPa drop indicates storm approach
-
-# Himachal Pradesh Districts
+# Himachal Pradesh Districts with coordinates
 HP_DISTRICTS = [
-    {"name": "Shimla", "lat": 31.1048, "lon": 77.1734},
-    {"name": "Mandi", "lat": 31.7084, "lon": 76.9319},
-    {"name": "Kullu", "lat": 31.9583, "lon": 77.1096},
-    {"name": "Kangra", "lat": 32.0998, "lon": 76.2695},
-    {"name": "Chamba", "lat": 32.5563, "lon": 76.1264},
-    {"name": "Una", "lat": 31.4685, "lon": 76.2714},
-    {"name": "Bilaspur", "lat": 31.3317, "lon": 76.7553},
-    {"name": "Hamirpur", "lat": 31.6839, "lon": 76.5225},
-    {"name": "Solan", "lat": 30.9045, "lon": 77.0967},
-    {"name": "Sirmaur", "lat": 30.5726, "lon": 77.2879},
-    {"name": "Kinnaur", "lat": 31.6050, "lon": 78.2357},
-    {"name": "Lahaul and Spiti", "lat": 32.5665, "lon": 77.0281}
+    {"name": "Shimla", "lat": 31.1048, "lon": 77.1734, "district": "Shimla"},
+    {"name": "Manali", "lat": 32.2396, "lon": 77.1887, "district": "Kullu"},
+    {"name": "Dharamshala", "lat": 32.2190, "lon": 76.3234, "district": "Kangra"},
+    {"name": "Kullu", "lat": 31.9576, "lon": 77.1091, "district": "Kullu"},
+    {"name": "Chamba", "lat": 32.5564, "lon": 76.1318, "district": "Chamba"},
+    {"name": "Mandi", "lat": 31.7085, "lon": 76.9319, "district": "Mandi"},
+    {"name": "Bilaspur", "lat": 31.3304, "lon": 76.7570, "district": "Bilaspur"},
+    {"name": "Hamirpur", "lat": 31.6839, "lon": 76.5226, "district": "Hamirpur"},
+    {"name": "Una", "lat": 31.4648, "lon": 76.2673, "district": "Una"},
+    {"name": "Kangra", "lat": 32.0998, "lon": 76.2691, "district": "Kangra"},
+    {"name": "Lahaul and Spiti", "lat": 32.7731, "lon": 77.0380, "district": "Lahaul and Spiti"},
+    {"name": "Kinnaur", "lat": 31.6046, "lon": 78.3887, "district": "Kinnaur"},
+    {"name": "Sirmaur", "lat": 30.5286, "lon": 77.3104, "district": "Sirmaur"},
+    {"name": "Solan", "lat": 30.9045, "lon": 77.0967, "district": "Solan"}
 ]
 
-# Enhanced Location-Based Monitoring Points
-# Major Cities, Hill Stations, River Areas, and Landslide-Prone Zones
+# Enhanced locations for better coverage
 HP_ENHANCED_LOCATIONS = [
-    {"name": "Shimla City", "lat": 31.1048, "lon": 77.1734, "type": "city", "district": "Shimla", "elevation": 2200, "risk_factors": ["landslide", "avalanche"]},
-    {"name": "Manali", "lat": 32.2396, "lon": 77.1887, "type": "city", "district": "Kullu", "elevation": 2050, "risk_factors": ["landslide", "flash_flood", "avalanche"]},
-    {"name": "Dharamshala", "lat": 32.2190, "lon": 76.3234, "type": "city", "district": "Kangra", "elevation": 1475, "risk_factors": ["landslide", "flash_flood"]},
-    {"name": "Kasauli", "lat": 30.8987, "lon": 76.9656, "type": "hill_station", "district": "Solan", "elevation": 1927, "risk_factors": ["landslide"]},
-    {"name": "Dalhousie", "lat": 32.5444, "lon": 76.0174, "type": "hill_station", "district": "Chamba", "elevation": 2036, "risk_factors": ["landslide", "heavy_snow"]},
-    {"name": "Kinnaur Highway", "lat": 31.5804, "lon": 78.4568, "type": "highway", "district": "Kinnaur", "elevation": 3500, "risk_factors": ["landslide", "rockfall", "avalanche"]},
-    {"name": "Rohtang Pass", "lat": 32.3730, "lon": 77.2497, "type": "mountain_pass", "district": "Kullu", "elevation": 3978, "risk_factors": ["avalanche", "landslide", "heavy_snow"]},
-    {"name": "Aut Tunnel Area", "lat": 31.8368, "lon": 77.1147, "type": "tunnel_zone", "district": "Kullu", "elevation": 1100, "risk_factors": ["landslide", "flash_flood"]},
-    {"name": "Kufri Hills", "lat": 31.1156, "lon": 77.2610, "type": "hill_area", "district": "Shimla", "elevation": 2720, "risk_factors": ["landslide", "heavy_snow"]},
-    {"name": "Narkanda Slopes", "lat": 31.2772, "lon": 77.3785, "type": "slope_area", "district": "Shimla", "elevation": 2708, "risk_factors": ["landslide", "avalanche"]},
-    {"name": "Beas River - Kullu", "lat": 31.9583, "lon": 77.1096, "type": "river", "district": "Kullu", "elevation": 1200, "risk_factors": ["flash_flood", "river_flood"]},
-    {"name": "Sutlej River - Bilaspur", "lat": 31.3317, "lon": 76.7553, "type": "river", "district": "Bilaspur", "elevation": 673, "risk_factors": ["flash_flood", "dam_overflow"]},
-    {"name": "Ravi River - Chamba", "lat": 32.5563, "lon": 76.1264, "type": "river", "district": "Chamba", "elevation": 996, "risk_factors": ["flash_flood", "glacial_melt"]},
-    {"name": "Yamuna River - Sirmaur", "lat": 30.5726, "lon": 77.2879, "type": "river", "district": "Sirmaur", "elevation": 932, "risk_factors": ["flash_flood", "monsoon_flood"]},
-    {"name": "Chenab River Basin", "lat": 32.4500, "lon": 76.0500, "type": "river_basin", "district": "Chamba", "elevation": 1200, "risk_factors": ["flash_flood", "glacial_lake_burst"]},
-    {"name": "Palampur Valley", "lat": 32.1104, "lon": 76.5365, "type": "valley", "district": "Kangra", "elevation": 1220, "risk_factors": ["flash_flood", "landslide"]},
-    {"name": "Karsog Valley", "lat": 31.3833, "lon": 76.7833, "type": "valley", "district": "Mandi", "elevation": 1200, "risk_factors": ["flash_flood", "landslide"]},
-    {"name": "Joginder Nagar", "lat": 31.9858, "lon": 76.7658, "type": "town", "district": "Mandi", "elevation": 1224, "risk_factors": ["flash_flood", "dam_related"]},
-    {"name": "Keylong", "lat": 32.5734, "lon": 77.0240, "type": "high_altitude", "district": "Lahaul and Spiti", "elevation": 3350, "risk_factors": ["avalanche", "extreme_cold", "landslide"]},
-    {"name": "Kaza", "lat": 32.2237, "lon": 78.0707, "type": "high_altitude", "district": "Lahaul and Spiti", "elevation": 3650, "risk_factors": ["avalanche", "extreme_cold", "flash_flood"]},
-    {"name": "Kalpa", "lat": 31.5361, "lon": 78.2592, "type": "high_altitude", "district": "Kinnaur", "elevation": 2960, "risk_factors": ["avalanche", "landslide", "extreme_cold"]},
-    {"name": "Bhakra Dam Area", "lat": 31.4086, "lon": 76.4348, "type": "dam_zone", "district": "Bilaspur", "elevation": 518, "risk_factors": ["dam_safety", "flash_flood"]},
-    {"name": "Pong Dam Area", "lat": 32.0500, "lon": 76.0500, "type": "dam_zone", "district": "Kangra", "elevation": 435, "risk_factors": ["dam_safety", "flash_flood"]},
-    {"name": "Pangi Valley", "lat": 32.8500, "lon": 76.3167, "type": "remote_valley", "district": "Chamba", "elevation": 2400, "risk_factors": ["landslide", "avalanche", "isolation"]},
-    {"name": "Pin Valley", "lat": 32.2000, "lon": 78.0500, "type": "remote_valley", "district": "Lahaul and Spiti", "elevation": 3500, "risk_factors": ["avalanche", "extreme_cold", "flash_flood"]}
+    {"name": "Kasauli", "lat": 30.8978, "lon": 76.9657, "district": "Solan"},
+    {"name": "Dalhousie", "lat": 32.5448, "lon": 75.9618, "district": "Chamba"},
+    {"name": "Palampur", "lat": 32.1085, "lon": 76.5318, "district": "Kangra"},
+    {"name": "Nalagarh", "lat": 30.9295, "lon": 76.6981, "district": "Solan"},
+    {"name": "Paonta Sahib", "lat": 30.4401, "lon": 77.6183, "district": "Sirmaur"},
+    {"name": "Sundarnagar", "lat": 31.5304, "lon": 76.8951, "district": "Mandi"},
+    {"name": "Jogindernagar", "lat": 32.0599, "lon": 76.7959, "district": "Mandi"},
+    {"name": "Baijnath", "lat": 32.0520, "lon": 76.6468, "district": "Kangra"},
+    {"name": "Nurpur", "lat": 32.2951, "lon": 75.9004, "district": "Kangra"},
+    {"name": "Dehra", "lat": 32.2032, "lon": 76.0839, "district": "Kangra"},
+    {"name": "Arki", "lat": 31.1521, "lon": 76.9658, "district": "Solan"},
+    {"name": "Theog", "lat": 31.1197, "lon": 77.3464, "district": "Shimla"},
+    {"name": "Rohru", "lat": 31.2070, "lon": 77.7513, "district": "Shimla"},
+    {"name": "Jubbal", "lat": 31.1095, "lon": 77.6523, "district": "Shimla"},
+    {"name": "Kotkhai", "lat": 31.2928, "lon": 77.5773, "district": "Shimla"},
+    {"name": "Ghumarwin", "lat": 31.4408, "lon": 76.7093, "district": "Bilaspur"},
+    {"name": "Sarkaghat", "lat": 31.7014, "lon": 76.7318, "district": "Mandi"},
+    {"name": "Nagrota Bagwan", "lat": 32.0963, "lon": 76.0869, "district": "Kangra"},
+    {"name": "Parwanoo", "lat": 30.8439, "lon": 76.9719, "district": "Solan"},
+    {"name": "Baddi", "lat": 30.9579, "lon": 76.7913, "district": "Solan"}
 ]
 
-# Risk Classification by Location Type
-LOCATION_RISK_PROFILES = {
-    "city": {"base_risk": 2, "population_factor": 3},
-    "hill_station": {"base_risk": 3, "elevation_factor": 2, "tourism_factor": 2},
-    "highway": {"base_risk": 4, "traffic_factor": 3},
-    "mountain_pass": {"base_risk": 5, "weather_sensitivity": 4},
-    "river": {"base_risk": 4, "monsoon_factor": 3},
-    "river_basin": {"base_risk": 4, "upstream_factor": 2},
-    "valley": {"base_risk": 3, "drainage_factor": 3},
-    "high_altitude": {"base_risk": 4, "extreme_weather_factor": 4},
-    "dam_zone": {"base_risk": 5, "infrastructure_factor": 4},
-    "remote_valley": {"base_risk": 3, "isolation_factor": 5}
+# Volunteer data for generation
+VOLUNTEER_NAME_PREFIXES = [
+    "Rahul", "Priya", "Amit", "Sunita", "Vikash", "Meera", "Rajesh", "Kavita",
+    "Suresh", "Anita", "Manoj", "Deepika", "Ravi", "Pooja", "Sanjay", "Neha",
+    "Arun", "Geeta", "Vinod", "Seema", "Ashok", "Reena", "Ramesh", "Shanti",
+    "Mohan", "Usha", "Dinesh", "Sushma", "Kishore", "Nisha", "Prakash", "Vandana"
+]
+
+VOLUNTEER_SKILLS = [
+    "First Aid", "Search and Rescue", "Medical Assistance", "Emergency Communication",
+    "Evacuation Support", "Relief Distribution", "Technical Rescue", "Community Coordination",
+    "Transportation", "Shelter Management", "Food Distribution", "Water Purification"
+]
+
+# Alert thresholds (adjusted for demo purposes)
+ALERT_THRESHOLDS = {
+    "rainfall": {
+        "moderate": 15.0,  # mm/hour - lowered for demo
+        "high": 25.0,      # mm/hour 
+        "critical": 40.0   # mm/hour
+    },
+    "temperature": {
+        "heat_moderate": 35.0,  # °C
+        "heat_high": 40.0,      # °C
+        "cold_moderate": 0.0,   # °C
+        "cold_high": -5.0       # °C
+    },
+    "wind_speed": {
+        "moderate": 25.0,  # km/h - lowered for demo
+        "high": 40.0,      # km/h
+        "critical": 60.0   # km/h
+    },
+    "humidity": {
+        "low": 30.0,       # % - for fire risk
+        "high": 85.0       # % - for flood/landslide risk
+    }
 }
 
-# Database Configuration
-DATABASE_PATH = "disaster_alert.db"
-
-# Data Collection Interval (minutes)
-DATA_COLLECTION_INTERVAL = 30
-
-# Volunteer Generation Configuration
-NUMBER_OF_VOLUNTEERS = 200
-VOLUNTEER_NAME_PREFIXES = [
-    "Volunteer", "Rescue", "Help", "Team", "Guardian"
-]
-VOLUNTEER_SKILLS = [
-    "First Aid", "Search & Rescue", "Crowd Management", "Communications",
-    "Medical Assistance", "Technical Skills (e.g., drone ops)", "Logistics",
-    "Psychological First Aid", "Debris Removal", "Shelter Management"
-]
+# ML model predictions weight in final alert decision
+ML_PREDICTION_WEIGHT = 0.0  # Temporarily disabled - ML predictions need retraining with real features
