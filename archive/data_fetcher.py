@@ -1,241 +1,183 @@
 """
-Data collection module for multiple weather and disaster monitoring APIs
+Enhanced data fetcher using Open-Meteo API for better precipitation data and disaster prediction
 """
 import requests
-import json
 import logging
-from datetime import datetime, timedelta
 import time
-from config import (
-    OPENWEATHER_API_KEY, NASA_USERNAME, NASA_PASSWORD, NASA_EARTHDATA_TOKEN,
-    CDS_API_KEY, CDS_URL, HP_DISTRICTS, HP_ENHANCED_LOCATIONS
-)
-from database import insert_weather_data
-from geopy.geocoders import Nominatim
-from geopy.exc import GeocoderTimedOut, GeocoderServiceError
+from datetime import datetime, timedelta
+from database import insert_weather_data, insert_precipitation_accumulation
+from config import HP_DISTRICTS, HP_ENHANCED_LOCATIONS
 
-# Setup logging
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-# Initialize geolocator for finding coordinates from district names
-geolocator = Nominatim(user_agent="hp_disaster_system")
 
 class DataFetcher:
     def __init__(self):
-        self.session = requests.Session()
-        self.session.headers.update({'User-Agent': 'HP-Disaster-Alert-System/1.0'})
-    
-    def fetch_openweather_data(self, enhanced_mode=True):
-        """Fetch weather data from OpenWeather API for districts and enhanced locations"""
-        logger.info("Fetching OpenWeather data...")
-        weather_data = []
+        # Open-Meteo API - no API key required, better precipitation data
+        self.base_url = "https://api.open-meteo.com/v1/forecast"
+        self.historical_url = "https://archive-api.open-meteo.com/v1/archive"
         
-        # Fetch data for all districts
-        locations_to_monitor = HP_DISTRICTS.copy()
-        
-        # Add enhanced locations if requested
-        if enhanced_mode:
-            locations_to_monitor.extend(HP_ENHANCED_LOCATIONS)
-            logger.info(f"Enhanced monitoring: {len(HP_ENHANCED_LOCATIONS)} additional locations")
-        
-        for location in locations_to_monitor:
-            try:
-                # Use predefined coordinates from config for a more reliable lookup
-                lat = location['lat']
-                lon = location['lon']
-                location_name = location['name']
-
-                url = f"http://api.openweathermap.org/data/2.5/weather"
-                params = {
-                    'lat': lat,
-                    'lon': lon,
-                    'appid': OPENWEATHER_API_KEY,
-                    'units': 'metric'
-                }
-                
-                response = self.session.get(url, params=params, timeout=30)
-                response.raise_for_status()
-                data = response.json()
-                
-                # Extract relevant weather information
-                location_type = location.get('type', 'district')
-                district_name = location.get('district', location_name)
-                elevation = location.get('elevation', 0)
-                risk_factors = location.get('risk_factors', [])
-                
-                weather_info = {
-                    'location': location_name,
-                    'district': district_name,
-                    'type': location_type,
-                    'elevation': elevation,
-                    'risk_factors': risk_factors,
-                    'temperature': data['main']['temp'],
-                    'rainfall': data.get('rain', {}).get('1h', 0.0),  # mm/hour
-                    'wind_speed': data['wind']['speed'],
-                    'humidity': data['main']['humidity'],
-                    'pressure': data['main']['pressure'],
-                    'description': data['weather'][0]['description'],
-                    'timestamp': datetime.now(),
-                    'coordinates': {'lat': lat, 'lon': lon}
-                }
-                
-                weather_data.append(weather_info)
-                
-                # Store in database (use location name for enhanced locations)
-                insert_weather_data(
-                    location_name,
-                    weather_info['temperature'],
-                    weather_info['rainfall'],
-                    weather_info['wind_speed'],
-                    weather_info['humidity'],
-                    weather_info['pressure'],
-                    weather_info['description'],
-                    'OpenWeather'
-                )
-                
-                logger.info(f"Successfully fetched data for {location_name} ({location_type})")
-                time.sleep(0.1)  # Rate limiting
-                
-            except Exception as e:
-                logger.error(f"Error fetching OpenWeather data for {location_name}: {str(e)}")
-                continue
-        
-        logger.info(f"OpenWeather data collection completed: {len(weather_data)} locations")
-        return weather_data
-    
-    def fetch_nasa_gpm_data(self):
-        """Fetch NASA GPM precipitation data"""
-        logger.info("Fetching NASA GPM data...")
+    def fetch_weather_for_location(self, location):
+        """Fetch enhanced weather data with precipitation accumulations using Open-Meteo API"""
         try:
-            base_url = "https://gpm1.gesdisc.eosdis.nasa.gov/data/GPM_L3/GPM_3IMERGHH.06/"
-            headers = {'Authorization': f'Bearer {NASA_EARTHDATA_TOKEN}'}
-            current_date = datetime.now()
-            date_str = current_date.strftime("%Y/%m/%d")
-            
-            logger.info("NASA GPM data collection initiated (requires NetCDF processing)")
-            return []
-            
-        except Exception as e:
-            logger.error(f"Error fetching NASA GPM data: {str(e)}")
-            return []
-    
-    def fetch_mosdac_data(self):
-        """Fetch MOSDAC ISRO satellite data"""
-        logger.info("Fetching MOSDAC data...")
-        try:
-            logger.info("MOSDAC data collection initiated (requires data file processing)")
-            return []
-            
-        except Exception as e:
-            logger.error(f"Error fetching MOSDAC data: {str(e)}")
-            return []
-    
-    def fetch_cds_climate_data(self):
-        """Fetch Climate Data Store data for enhanced weather intelligence"""
-        logger.info("Fetching Climate Data Store data...")
-        try:
-            if not CDS_API_KEY:
-                logger.warning("CDS API key not provided for Climate Data Store")
-                return []
-            
-            headers = {
-                'Content-Type': 'application/json',
-                'X-CDS-API-Key': CDS_API_KEY
+            # Get current and recent weather data from Open-Meteo
+            params = {
+                'latitude': location['lat'],
+                'longitude': location['lon'],
+                'current': 'temperature_2m,precipitation,wind_speed_10m,relative_humidity_2m,surface_pressure,weather_code',
+                'hourly': 'temperature_2m,precipitation,wind_speed_10m,relative_humidity_2m',
+                'past_days': 1,  # Get last 24 hours for accumulation
+                'forecast_days': 1,
+                'timezone': 'Asia/Kolkata'
             }
             
-            hp_bounds = {
-                'north': 33.0,
-                'south': 30.0, 
-                'east': 79.5,
-                'west': 75.0
+            response = requests.get(self.base_url, params=params, timeout=15)
+            response.raise_for_status()
+            
+            data = response.json()
+            
+            # Extract current weather
+            current = data['current']
+            weather_code = current.get('weather_code', 0)
+            description = self.get_weather_description(weather_code)
+            
+            # Extract hourly data for accumulations
+            hourly = data['hourly']
+            times = hourly['time']
+            precipitation = hourly['precipitation']
+            
+            # Calculate rainfall accumulations
+            current_time = datetime.now()
+            rainfall_1h = current.get('precipitation', 0)
+            rainfall_3h = sum(precipitation[-3:]) if len(precipitation) >= 3 else sum(precipitation)
+            rainfall_24h = sum(precipitation[-24:]) if len(precipitation) >= 24 else sum(precipitation)
+            
+            # Calculate Antecedent Precipitation Index (API) - simplified version
+            # API considers recent rainfall with exponential decay
+            api = self.calculate_antecedent_precipitation_index(precipitation)
+            
+            weather_info = {
+                'location': location['name'],
+                'district': location.get('district', location['name']),
+                'temperature': current['temperature_2m'],
+                'rainfall': rainfall_1h,
+                'wind_speed': current['wind_speed_10m'],
+                'humidity': current['relative_humidity_2m'],
+                'pressure': current['surface_pressure'],
+                'description': description,
+                'timestamp': current_time,
+                'rainfall_3h': rainfall_3h,
+                'rainfall_24h': rainfall_24h,
+                'api': api
             }
             
-            climate_data = []
+            # Store basic weather data
+            insert_weather_data(
+                district=weather_info['district'],
+                temperature=weather_info['temperature'],
+                rainfall=weather_info['rainfall'],
+                wind_speed=weather_info['wind_speed'],
+                humidity=weather_info['humidity'],
+                pressure=weather_info['pressure'],
+                description=weather_info['description'],
+                source='Open-Meteo'
+            )
             
-            logger.info("CDS integration ready - would fetch historical climate patterns")
-            logger.info("Provides: Precipitation forecasts, temperature trends, extreme weather indicators")
+            # Store precipitation accumulation data for disaster prediction
+            insert_precipitation_accumulation(
+                district=weather_info['district'],
+                rainfall_1h=rainfall_1h,
+                rainfall_3h=rainfall_3h,
+                rainfall_24h=rainfall_24h,
+                api=api,
+                source='Open-Meteo'
+            )
             
-            return climate_data
+            logger.info(f"Weather data collected for {location['name']}")
+            return weather_info
             
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Error fetching weather for {location['name']}: {str(e)}")
+            return None
         except Exception as e:
-            logger.error(f"Error fetching CDS data: {str(e)}")
-            return []
+            logger.error(f"Unexpected error for {location['name']}: {str(e)}")
+            return None
     
-    def fetch_glofas_data(self):
-        """Fetch GloFAS flood forecast data"""
-        logger.info("Fetching GloFAS data...")
-        try:
-            if not CDS_API_KEY:
-                logger.warning("CDS API key not provided for GloFAS data")
-                return []
-            
-            logger.info("GloFAS data collection initiated for HP river systems")
-            logger.info("Monitoring: Beas, Sutlej, Ravi, Yamuna, Chenab river basins")
-            
-            return []
-            
-        except Exception as e:
-            logger.error(f"Error fetching GloFAS data: {str(e)}")
-            return []
+    def get_weather_description(self, weather_code):
+        """Convert Open-Meteo weather code to description"""
+        weather_codes = {
+            0: "Clear sky",
+            1: "Mainly clear", 2: "Partly cloudy", 3: "Overcast",
+            45: "Fog", 48: "Depositing rime fog",
+            51: "Light drizzle", 53: "Moderate drizzle", 55: "Dense drizzle",
+            56: "Light freezing drizzle", 57: "Dense freezing drizzle",
+            61: "Slight rain", 63: "Moderate rain", 65: "Heavy rain",
+            66: "Light freezing rain", 67: "Heavy freezing rain",
+            71: "Slight snow", 73: "Moderate snow", 75: "Heavy snow",
+            77: "Snow grains",
+            80: "Slight rain showers", 81: "Moderate rain showers", 82: "Violent rain showers",
+            85: "Slight snow showers", 86: "Heavy snow showers",
+            95: "Thunderstorm", 96: "Thunderstorm with slight hail", 99: "Thunderstorm with heavy hail"
+        }
+        return weather_codes.get(weather_code, "Unknown")
+    
+    def calculate_antecedent_precipitation_index(self, precipitation_data):
+        """Calculate Antecedent Precipitation Index for landslide risk assessment"""
+        if not precipitation_data:
+            return 0.0
+        
+        # Simplified API calculation - exponential decay of recent rainfall
+        api = 0.0
+        decay_factor = 0.9  # Daily decay rate
+        
+        for i, precip in enumerate(reversed(precipitation_data[-24:])):  # Last 24 hours
+            hours_ago = i + 1
+            decay = decay_factor ** (hours_ago / 24.0)  # Decay over days
+            api += precip * decay
+        
+        return api
     
     def collect_all_data(self):
-        """Collect data from all available sources"""
-        logger.info("Starting comprehensive data collection...")
+        """Collect weather data for all configured locations"""
+        logger.info("Starting weather data collection cycle...")
         
-        all_data = {
-            'openweather': [],
-            'nasa_gpm': [],
-            'mosdac': [],
-            'glofas': [],
-            'collection_time': datetime.now()
-        }
+        all_locations = HP_DISTRICTS + HP_ENHANCED_LOCATIONS
+        successful_collections = 0
+        weather_data = []
         
-        all_data['openweather'] = self.fetch_openweather_data()
-        all_data['nasa_gpm'] = self.fetch_nasa_gpm_data()
-        all_data['mosdac'] = self.fetch_mosdac_data()
-        all_data['cds_climate'] = self.fetch_cds_climate_data()
-        all_data['glofas'] = self.fetch_glofas_data()
+        for location in all_locations:
+            weather_info = self.fetch_weather_for_location(location)
+            if weather_info:
+                weather_data.append(weather_info)
+                successful_collections += 1
+            
+            # Small delay to respect API rate limits
+            time.sleep(0.1)
         
-        logger.info(f"Data collection completed. OpenWeather: {len(all_data['openweather'])} records")
-        return all_data
-
-def get_location_coordinates(location_name):
-    """
-    Utility function to get location coordinates from a name.
-    """
-    try:
-        location = geolocator.geocode(f"{location_name}, Himachal Pradesh, India")
-        if location:
-            return {'lat': location.latitude, 'lon': location.longitude}
-        else:
-            logger.warning(f"Could not find coordinates for {location_name}")
+        logger.info(f"Weather data collection completed: {successful_collections}/{len(all_locations)} successful")
+        return weather_data
+    
+    def get_latest_weather_summary(self):
+        """Get a summary of the latest weather conditions"""
+        from database import get_latest_weather_data
+        
+        weather_data = get_latest_weather_data()
+        if not weather_data:
             return None
-    except (GeocoderTimedOut, GeocoderServiceError) as e:
-        logger.error(f"Geocoding service error for {location_name}: {e}")
-        return None
-    except Exception as e:
-        logger.error(f"An unexpected error occurred during geocoding: {e}")
-        return None
         
-def test_data_collection():
-    """Test function to verify data collection"""
-    fetcher = DataFetcher()
-    data = fetcher.collect_all_data()
-    
-    print("=== Data Collection Test Results ===")
-    print(f"Collection Time: {data['collection_time']}")
-    print(f"OpenWeather Records: {len(data['openweather'])}")
-    
-    if data['openweather']:
-        print("\n=== Sample OpenWeather Data ===")
-        for record in data['openweather'][:3]:
-            print(f"District: {record['district']}")
-            print(f"Temperature: {record['temperature']}°C")
-            print(f"Rainfall: {record['rainfall']} mm/h")
-            print(f"Wind Speed: {record['wind_speed']} m/s")
-            print(f"Description: {record['description']}")
-            print("---")
-
-if __name__ == "__main__":
-    test_data_collection()
+        # Convert to list of dictionaries for easier processing
+        weather_list = []
+        for row in weather_data:
+            weather_dict = {
+                'district': row[0],
+                'timestamp': row[1],
+                'temperature': row[2],
+                'rainfall': row[3],
+                'wind_speed': row[4],
+                'humidity': row[5],
+                'pressure': row[6],
+                'description': row[7],
+                'source': row[8]
+            }
+            weather_list.append(weather_dict)
+        
+        return weather_list
